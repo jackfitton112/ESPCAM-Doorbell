@@ -33,21 +33,23 @@ For this project you will need:
 
 ## Installation
 
+ >__This is now handled in a .env file , see [sample .env](https://github.com/jackfitton112/ESPCAM-Doorbell/blob/main/sample%20.env)__
+
 #### `motion-send.py`
  has some config options that need setting. it is recommended to run this on the same device as motioneye runs on as it will be able to access the images directly. 
 
- The config options are:
+ ~~The config options are:~~
 
-   - MQTT_BROKER
-   - IMG_DIR_PATH
+   - ~~MQTT_BROKER~~
+   - ~~IMG_DIR_PATH~~
 
 #### `yolo-process.py`
 
 This script is used to process the images from motioneye and send them to the discord bot. It is recommended to run this on a proper PC / Server as it is quite resource intensive.
 
-The config options are:
+~~The config options are:~~
 
-   - MQTT_BROKER
+   - ~~MQTT_BROKER~~
 
 
 #### `discord-bot.py`

@@ -1,17 +1,14 @@
 
 import paho.mqtt.client as mqtt
 import discord, datetime, time, threading, queue
-import sys, os, json, base64
+import os, json, base64
 from dotenv import load_dotenv
+from datetime import datetime
+
 
 load_dotenv()
 
-# MQTT
-MQTT_BROKER = os.getenv("MQTT_BROKER")
-MQTT_PORT = os.getenv("MQTT_PORT")
-MQTT_KEEPALIVE = 60
-MQTT_TOPIC = "home/doorbell/yolo"
-
+#
 # Discord
 TOKEN = os.getenv("DISCORD_TOKEN")
 
@@ -20,123 +17,135 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 q = queue.Queue()
 discord_q = queue.Queue()
 
-#declare mqtt callback functions
-def on_connect(client, userdata, flags, rc):
-    #if successful, rc = 0
-    if rc == 0:
-        pass
-    else:
-        print("Connection Failed")
+#this program needs 3 threads
+#1. mqtt thread
+#2. discord thread
+#3. interface thread
 
-def on_message(client, userdata, msg):
-    if msg.topic == MQTT_TOPIC:
-        q.put(msg.payload.decode("utf-8"))
+#mqtt thread
+def mqtt_thread():
 
+    def on_message(client, userdata, msg):
+        print("mqtt message received")
+        q.put(msg.payload)
 
-#declare discord callback functions
-def process_img():
-    #data comes in as a json string with the following format:
-    #{"time": UNIX_TIMESTAMP, "image": BASE64_IMG, "detected": LIST_OF_DETECTED_OBJECTS}
+    #on connect function
+    def on_connect(client, userdata, flags, rc):
+        print("mqtt connected")
+        client.subscribe(MQTT_TOPIC)
+    
 
-    while True:
+    MQTT_BROKER = os.getenv("MQTT_BROKER")
+    MQTT_PORT = 1883
+    MQTT_KEEPALIVE = 60
+    MQTT_TOPIC = "home/doorbell/yolo"
 
-        if q.empty():
-            time.sleep(1)
-            continue
+    print("mqtt thread started")
+    client = mqtt.Client()
+    client.connect(MQTT_BROKER, MQTT_PORT, MQTT_KEEPALIVE)
+    client.on_message = on_message
+    client.on_connect = on_connect
 
-        data = q.get()
+    client.loop_start()
 
-        #convert the json string into a python dictionary
-        data = json.loads(data)
-
-        #convert time into dd/mm/yy - hh:mm:ss
-        img_time = data[data].split(".")[0]
-        img_time = datetime.datetime.fromtimestamp(int(img)).strftime("%d/%m/%y - %H:%M:%S")
-        image = data["image"]
-
-        #base64 decode the image
-        image = base64.b64decode(image)
-
-        detected = data["detected"]
-
-        if len(detected) == 0:
-            return False
-        
-        #if discord-tmp doesn't exist, create it
-        if not os.path.exists("discord-tmp"):
-            os.mkdir("./discord-tmp")
-
-        filename = "./discord-tmp/discord-" + str(img_time) + ".jpg"
-        
-        #save the image to a file
-        with open("./discord-tmp/image.jpg", "wb") as f:
-            f.write(image)
-
-
-        output = {"time": img_time, "detected": detected, "file": filename}
-        discord_q.put(output)
-
-def send_message(TOKEN):
-
-    intents = discord.Intents.all()
+#discord thread
+def discord_thread():
+    
+    #setup discord client
+    intents = discord.Intents.default()
     intents.members = True
     intents.presences = True
     intents.messages = True
     client = discord.Client(intents=intents)
 
+
+    @client.event
+    async def on_ready():
+        #print("discord thread started")
+        #start send message thread
+        client.loop.create_task(send_messages())
+
+    async def send_messages():
+        await client.wait_until_ready()
+        DISCORD_CHANNEL_ID = os.getenv("DISCORD_CHANNEL_ID")
+        channel = client.get_channel(int(DISCORD_CHANNEL_ID))
+
+        while True:
+
+            if discord_q.empty():
+                time.sleep(1)
+                pass
+
+            msg, file = discord_q.get()
+            print(msg, file)
+            file = discord.File(file, filename=file)
+            await channel.send(msg, file=file)
+
+            #delete file
+            os.remove(file)
+
+            #remove item from queue
+            discord_q.task_done()
+
     client.run(TOKEN)
 
-    async def send(msg, file):
-        channel = client.get_channel(1111814648862343241)
-        await channel.send(msg, file=file)
+#interface thread
+def interface_thread():
 
+    #takes mqtt message and parses it into a discord message
     while True:
-        if discord_q.empty():
+        if q.empty():
             time.sleep(1)
-            continue
+            pass
 
-        data = discord_q.get()
+        msg = q.get()
 
-        #get the image file
-        file = discord.File(data["file"], filename="image.jpg")
+        #load json
+        msg = json.loads(msg)
 
-        #get the time
-        time = data["time"]
+        #get image
+        img = msg["image"]
+        img = base64.b64decode(img)
 
-        #get the detected objects
-        detected = data["detected"]
+        #get timestamp
+        timestamp = msg["time"].split(".")[0]
 
-        #create the message
-        msg = "Detected: " + str(detected) + "\nTime: " + str(time)
+        #get detected
+        detected = msg["detected"]
 
-        #send the message
-        client.loop.create_task(send(msg, file))
+        #save image to temp folder
 
+        #if /tmp/ doesn't exist, create it
+        if not os.path.exists("./tmp/"):
+            os.makedirs("./tmp/")
 
-# Create the MQTT client
-mqtt_client = mqtt.Client()
-mqtt_client.connect(MQTT_BROKER, MQTT_PORT, MQTT_KEEPALIVE)
-mqtt_client.subscribe(MQTT_TOPIC)
+        #create filename
+        filename = "./tmp/img-" + timestamp + ".jpg"
 
-# Set the MQTT callbacks
-mqtt_client.on_connect = on_connect
-mqtt_client.on_message = on_message
+        #save image
+        with open(filename, "wb") as f:
+            f.write(img)
 
+        #convert unix timestamp to datetime
+        timestamp = datetime.utcfromtimestamp(int(timestamp)).strftime('%Y-%m-%d %H:%M:%S')
 
-#spawn thread
-process_thread = threading.Thread(target=process_img).start()
-send_thread = threading.Thread(target=send_message, args=(TOKEN,)).start()
+        msg = f"New Event Detected {str(detected)} at {timestamp}:"
+        print(msg)
 
-#start the mqtt loop
-mqtt_client.loop_start()
+        discord_q.put((msg, filename))
 
-
-
-
-
-
+        #remove task from queue
+        q.task_done()
 
 
+#start threads
+t1 = threading.Thread(target=mqtt_thread).start()
+t2 = threading.Thread(target=discord_thread).start()
+t3 = threading.Thread(target=interface_thread).start()
+
+while True:
+    time.sleep(1)
+    pass
 
 
 
