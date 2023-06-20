@@ -3,9 +3,6 @@
 ## THIS PROJECT IS STILL UNDER DEVELOPMENT AND IS NOT COMPLETE
 ---
 
-![Raw image from MotionEye](images/raw.png)
-![YOLO output image](images/detected.png)
-
 ## Introduction
 
 This project is a doorbell that uses a ESP32-CAM to detect people and send a notification to your phone. It uses YOLOv3 to detect objects when motion is detected.
