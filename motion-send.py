@@ -3,11 +3,14 @@ import paho.mqtt.client as mqtt
 import time
 import json
 import base64
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 # MQTT settings
-MQTT_BROKER = ""
-MQTT_PORT = 1883
+MQTT_BROKER = os.getenv("MQTT_BROKER")
+MQTT_PORT = os.getenv("MQTT_PORT")
 MQTT_KEEPALIVE = 60
 MQTT_TOPIC = "home/doorbell/motion"
 

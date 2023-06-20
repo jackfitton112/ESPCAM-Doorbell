@@ -8,11 +8,14 @@ import numpy as np
 import datetime
 import threading
 import queue
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 # MQTT settings
-MQTT_BROKER = ""
-MQTT_PORT = 1883
+MQTT_BROKER = os.getenv("MQTT_BROKER")
+MQTT_PORT = os.getenv("MQTT_PORT")
 MQTT_KEEPALIVE = 60
 MQTT_TOPIC = "home/doorbell/motion"
 MQTT_PUB_TOPIC = "home/doorbell/yolo"

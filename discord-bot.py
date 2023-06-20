@@ -2,15 +2,18 @@
 import paho.mqtt.client as mqtt
 import discord, datetime, time, threading, queue
 import sys, os, json, base64
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # MQTT
-MQTT_BROKER = "192.168.1.253"
-MQTT_PORT = 1883
+MQTT_BROKER = os.getenv("MQTT_BROKER")
+MQTT_PORT = os.getenv("MQTT_PORT")
 MQTT_KEEPALIVE = 60
 MQTT_TOPIC = "home/doorbell/yolo"
 
 # Discord
-TOKEN = "MTExMTgxNTIyMTEwMzgzMzEzOA.GcRYrk.F7bmAARoGaEEpTXpX-VELAVu2M_3eXduWktdwk"
+TOKEN = os.getenv("DISCORD_TOKEN")
 
 
 # Create the queues
