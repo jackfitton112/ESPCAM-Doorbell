@@ -8,11 +8,7 @@
 
 ## Introduction
 
-<<<<<<< HEAD
-This project is a doorbell that uses a ESP32-CAM to detect people and send a notification to your phone. It uses YOLOv7 to detect objects when motion is detected.
-=======
 This project is a doorbell that uses a ESP32-CAM to detect people and send a notification to your phone. It uses YOLOv3 to detect objects when motion is detected.
->>>>>>> added main files
 
 The goal is to have a discord bot notify you when someone is at your door. The bot will first send a message and then an image of the person at the door.
 
@@ -35,11 +31,8 @@ For this project you will need:
 
 - [Python3](https://www.python.org/downloads/) - the YOLO Libary uses Python3, it is recommended to use the `requirements.txt` to install the required packages as openCV currently has dependancy issues with Python3.9
 
-<<<<<<< HEAD
-=======
 - yolov3.weights - this is the pretrained model data, it should be put in `./utils` and can be downloaded from [here](https://pjreddie.com/media/files/yolov3.weights)
 
->>>>>>> added main files
 
 ## Installation
 
