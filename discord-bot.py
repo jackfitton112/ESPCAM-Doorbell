@@ -169,3 +169,5 @@ t3 = threading.Thread(target=discord_send).start()
 #tdebug = threading.Thread(target=DEBUG_print_q).start()
 
 
+while True:
+    time.sleep(1)
