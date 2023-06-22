@@ -1,6 +1,9 @@
 # ESPCAM-Doorbell
 
-## THIS PROJECT IS STILL UNDER DEVELOPMENT AND IS NOT COMPLETE
+![python Version 3.8.10](https://img.shields.io/badge/python_version-3.8.10-blue)
+![GitHub](https://img.shields.io/github/license/jackfitton112/ESPCAM-Doorbell)
+
+
 ---
 
 ## Introduction
@@ -54,7 +57,13 @@ This script is used to process the images from motioneye and send them to the di
 
 #### `discord-bot.py`
 
-TO BE COMPLETED
+This script runs the discord bot, it gets the messages from MQTT and converts them into a discord message, it also sends the images to discord. 
+
+see below an example of the discord bot in action:
+
+![Discord bot in action](/images/discord.png)
+
+
 
 
  
