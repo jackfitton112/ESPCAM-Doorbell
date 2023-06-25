@@ -4,15 +4,24 @@ import time
 import json
 import base64
 from dotenv import load_dotenv
+import requests
 
 load_dotenv()
 
 
 # MQTT settings
-MQTT_BROKER = os.getenv("MQTT_BROKER")
-MQTT_PORT = os.getenv("MQTT_PORT")
+try:
+    MQTT_BROKER = os.getenv("MQTT_BROKER")
+    MQTT_PORT = int(os.getenv("MQTT_PORT"))
+    MOTION_EYE_URL = os.getenv("MOTION_EYE_URL")
+except:
+    print("Error getting environment variables")
+    exit(1)
+
+
 MQTT_KEEPALIVE = 60
 MQTT_TOPIC = "home/doorbell/motion"
+MQTT_SUB_TOPIC = "home/doorbell/live"
 
     # Create the MQTT client
 client = mqtt.Client()
@@ -23,12 +32,28 @@ client.connect(MQTT_BROKER, MQTT_PORT, MQTT_KEEPALIVE)
 def on_connect(client, userdata, flags, rc):
     #if successful, rc = 0
     if rc == 0:
-        pass
+        client.subscribe(MQTT_SUB_TOPIC)
     else:
         print("Connection failed")
 
-client.on_connect = on_connect
 
+def on_message(client, userdata, msg):
+    
+    # Get the message
+    message = msg.payload.decode("utf-8")
+
+    if message == "true":
+        # Get the images
+        #print("getting images")
+        get_images_http()
+
+
+
+
+# Setup the callbacks
+
+client.on_connect = on_connect
+client.on_message = on_message
      
 
 # Script settings
@@ -38,7 +63,11 @@ IMAGE_DIR_PATH = ""
 def get_images():
     # Get the list of images
     images = []
-    dirs = os.listdir(IMAGE_DIR_PATH)
+    try:
+        dirs = os.listdir(IMAGE_DIR_PATH)
+
+    except:
+        return False
 
     if len(dirs) == 0:
         return False
@@ -90,6 +119,37 @@ def send_images(images):
      
     # Return true
     return True
+
+def get_images_http():
+
+    #TODO: This is currently blocking, need to make it async
+
+    url = MOTION_EYE_URL + "/picture/1/current/"
+
+    res = requests.get(url)
+
+
+    if res.status_code == 200:
+
+        encoded_string = base64.b64encode(res.content)
+
+    else:
+
+        return False
+
+
+
+    #publish the image
+    payload = json.dumps({"time": time.time(), "camera": CAMERA_NAME, "image": encoded_string.decode("utf-8")})
+
+    # Publish the payload
+    client.publish(MQTT_TOPIC, payload)
+
+    return True
+
+
+
+    
 
 
 

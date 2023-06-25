@@ -23,15 +23,31 @@ except:
 
 
 
-#this script needs to listen to the MQTT topic and send the image to the discord channel when it receives a message,
-# it needs to be able to handle multiple messages at once, and it needs to be able to handle multiple images at once
-
-#there will be three threads, one for listening to the MQTT topic and one for sending the images to the discord channel and one for handling the queue
-
 #setup inbound queue
 mqtt_queue = queue.Queue()
 #setup outbound queue
 discord_queue = queue.Queue()
+
+
+
+def mqtt_send():
+
+    #terminating thread, send live message to MQTT broker and then stop thread
+
+    #setup the MQTT client
+    client = mqtt.Client()
+
+    #connect to the MQTT broker
+    client.connect(MQTT_BROKER, MQTT_PORT, 60)
+
+    #send the live message
+    client.publish("home/doorbell/live", "true")
+
+    #stop the MQTT loop
+    client.loop_stop()
+
+    #exit the thread
+    exit()
 
 
 def mqtt_listen():
@@ -45,8 +61,11 @@ def mqtt_listen():
         #put the message in the queue
         try:
             mqtt_queue.put(msg.payload.decode("utf-8"))
+
+
         except:
             pass
+
 
     #setup the MQTT client
     client = mqtt.Client()
@@ -57,7 +76,7 @@ def mqtt_listen():
     client.connect(MQTT_BROKER, MQTT_PORT, 60)
 
     #start the MQTT loop
-    client.loop_forever()
+    client.loop_start()
 
 def queue_handler():
 
@@ -100,8 +119,26 @@ def discord_send():
     @client.event
     async def on_ready():
         print("Logged in as {0.user}".format(client))
-        client.loop.create_task(main_loop())    
+        client.loop.create_task(main_loop())
 
+    @client.event
+    async def on_message(message):
+        if message.author == client.user:
+            return
+
+        if message.content.startswith("!live"):
+            await message.channel.send("Getting live image...")
+
+            #check thread is not already running
+            try:
+                t4 = threading.Thread(target=mqtt_send).start()
+            except:
+                pass
+
+
+
+
+        
         
     #run a non blocking loop to send the messages
     async def send_message():
@@ -149,24 +186,9 @@ def discord_send():
     client.run(TOKEN)
 
 
-
-def DEBUG_print_q():
-
-    while True:
-        print("MQTT queue size: " + str(mqtt_queue.qsize()))
-        print("Discord queue size: " + str(discord_queue.qsize()))
-        time.sleep(1)
-
-
-
-
-
 t1 = threading.Thread(target=mqtt_listen).start()
 t2 = threading.Thread(target=queue_handler).start()
 t3 = threading.Thread(target=discord_send).start()
-
-
-#tdebug = threading.Thread(target=DEBUG_print_q).start()
 
 
 while True:

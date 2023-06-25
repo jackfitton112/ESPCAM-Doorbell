@@ -66,7 +66,12 @@ see below an example of the discord bot in action:
 
 
 
- 
+#### TODO:
+
+- [ ] make !live work in `motion-send.py` asyincronously
+- [ ] add a config file for the discord bot
+- [ ] Rework threading in `motion-send.py` to be more efficient
+- [ ] Upgrade to YOLOv4+ for better accuracy
 
 
 
