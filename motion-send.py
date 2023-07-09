@@ -93,13 +93,6 @@ async def on_message(client, userdata, msg):
         return False
 
 
-
-
-# Setup the callbacks for the MQTT client
-client.on_connect = on_connect
-client.on_message = on_message
-
-
 # This is a function to capture the images from the motion eye server and return them as a base64 string
 # it either returns a list of images or false if there are no images
 def get_images() -> list / bool:
@@ -218,6 +211,10 @@ async def main() -> None:
     # Connect to the MQTT broker
     client.connect(MQTT_BROKER, MQTT_PORT, MQTT_KEEPALIVE)
 
+    # Setup the callbacks for the MQTT client
+    client.on_connect = on_connect
+    client.on_message = on_message
+
     # Start the MQTT client loop
     client.loop_start()
 
@@ -234,7 +231,7 @@ async def main() -> None:
             await asyncio.sleep(1)
 
 
-# Run the main function
+# Run the main function using asyncio
 asyncio.run(main())
           
 
