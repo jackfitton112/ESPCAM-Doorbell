@@ -139,6 +139,7 @@ venv.bak/
 # mkdocs documentation
 /site
 
+
 # mypy
 .mypy_cache/
 .dmypy.json
@@ -160,3 +161,4 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 utils/yolov3.weights
+utils/yolov8n.pt
