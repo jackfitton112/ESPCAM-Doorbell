@@ -1,29 +1,46 @@
-import paho.mqtt.client as mqtt
-import time
-import json
-import base64
-import os
-import cv2
+import time, json, base64, os, cv2, threading, queue
 import numpy as np
-import threading
-import queue
+import paho.mqtt.client as mqtt
 from dotenv import load_dotenv
-from ultralytics import YOLO
-from PIL import Image
 
-load_dotenv()
+def loadFromEnv():
 
+    #load the .env file using the dotenv library
+    if load_dotenv() == False:
+        assert False, "Error loading .env file"
+
+
+    #declare the global variables to be used in the script
+    global MQTT_BROKER
+    global MQTT_PORT
+    global MOTION_EYE_URL
+    global MQTT_USER
+    global MQTT_PASS
+
+    MQTT_BROKER = os.getenv("MQTT_BROKER") 
+    MQTT_PORT = int(os.getenv("MQTT_PORT")) #Must be type cast to int for lib
+    MOTION_EYE_URL = os.getenv("MOTION_EYE_URL")
+    MQTT_USER = os.getenv("MQTT_USER")
+    MQTT_PASS = os.getenv("MQTT_PASS")
+
+    #check if the variables are set
+    if (MQTT_BROKER == None or MQTT_PORT == None or MOTION_EYE_URL == None or 
+        MQTT_USER == None or MQTT_PASS == None):
+  
+        assert False, "Error loading .env variables"
+
+    return True
+
+loadFromEnv()
 
 # MQTT settings
-MQTT_BROKER = os.getenv("MQTT_BROKER")
-MQTT_PORT = os.getenv("MQTT_PORT")
 MQTT_KEEPALIVE = 60
 MQTT_TOPIC = "home/doorbell/motion"
 MQTT_PUB_TOPIC = "home/doorbell/yolo"
 
 # Script settings
-q = queue.Queue()
-publishq = queue.Queue()
+image_process_queue = queue.Queue()
+mqtt_publish_queue = queue.Queue()
 
 def image_process():
 
@@ -129,63 +146,20 @@ def image_process():
         output = {"image": img, "detected": detected_things}
 
         return output
-        
 
-
-        
-
-
-    while True:           
-
-        # if no message in queue, wait
-        if q.empty():
-            time.sleep(1)
-            #print("no message")
-            continue
-
-        # get message from queue
-        msg = q.get()
-        #print("got message")
-
-        # decode message
-        msg = msg.decode("utf-8")
-
-        # convert to json
-        msg = json.loads(msg)
-
-        #message contains time, camera name, and image  (image is base64 encoded)
-        try:
-            img_time = str(round(msg["time"],0))
-            img_camera = msg["camera"]
-            img_data = msg["image"]
-        except:
-            continue
-
-        #decode image
-        img_data = base64.b64decode(img_data)
-
-        #make temp directory if it doesn't exist
+    def save_image(img, filename):
+        #create a temp directory if it doesn't exist
         if not os.path.exists("./tmp"):
             os.makedirs("./tmp")
 
-        #save image to temp file
-        img_file = "./tmp/" + img_camera + "-" + img_time + ".jpg"
+        file_path = "./tmp/" + filename
 
-        #send image to yolo
-        with open(img_file, "wb") as f:
-            f.write(img_data)
+        with open(file_path, "wb") as f:
+            f.write(img)
 
-        output = yolo(img_file)
-
-        outimg = output["image"]
-        outdetect = output["detected"]
-
-        #outimg needs to be json serializable
-        outimg = outimg.decode("utf-8")
-
-        #publish message
-        publishq.put({"time": img_time, "camera": img_camera, "image": outimg, "detected": outdetect})
-
+        return file_path
+        
+    def remove_tmp_dir():
         #delete all files in temp directory
         for file in os.listdir("./tmp"):
             os.remove("./tmp/" + file)
@@ -193,23 +167,72 @@ def image_process():
         #delete temp directory
         os.rmdir("./tmp")
 
+    while True:           
+
+        # if no message in queue, wait
+        if image_process_queue.empty():
+            time.sleep(1)
+            continue
+
+        # get the decoded message from queue
+        msg = image_process_queue.get()
+
+        # convert json to dict
+        msg = json.loads(msg)
+
+        #message contains time, camera name, and image  (image is base64 encoded)
+        if not("time" in msg and "camera" in msg and "image" in msg):
+            continue
+
+        img_time = msg["time"] #time image was taken (in unix time)
+        img_camera = msg["camera"] #camera name
+        img_data = base64.b64decode(msg["image"]) #decode image from base64 string to bytes
+
+
+        #make temp directory if it doesn't exist
+        if not os.path.exists("./tmp"):
+            os.makedirs("./tmp")
+
+        #save image to temp file
+        img_file = img_camera + "-" + img_time + ".jpg"
+
+        #send image to yolo
+        output = yolo(save_image(img_data, img_file))
+
+        output_img = output["image"] #file path of image
+        output_detected = output["detected"] # list of what has been detected
+
+        #outimg needs to be json serializable
+        output_img = output_img.decode("utf-8")
+
+        #publish message
+        mqtt_publish_queue.put({"time": img_time, "camera": img_camera, "image": output_img, "detected": output_detected})
+
+        #remove temp directory
+        remove_tmp_dir()
+
 def publish():
 
     while True:
 
         # if no message in queue, wait
-        if publishq.empty():
+        if mqtt_publish_queue.empty():
             time.sleep(1)
             continue
 
         # get message from queue
-        msg = publishq.get()
+        msg = mqtt_publish_queue.get()
 
         # publish message
         client.publish(MQTT_PUB_TOPIC, json.dumps(msg))
 
+        #remove item from queue
+        mqtt_publish_queue.task_done()
+
+    
+
 def on_connect(client, userdata, flags, rc):
-    #if successful, rc = 0
+    #if successful rc = 0
     if rc == 0:
         pass
     else:
@@ -218,8 +241,10 @@ def on_connect(client, userdata, flags, rc):
 def on_message(client, userdata, msg):
     #print("got message")
     if msg.topic == "home/doorbell/motion":
-        print("got message from doorbell")
-        q.put(msg.payload)
+        #decode message
+        msg = msg.payload.decode("utf-8")
+        #add message to queue
+        image_process_queue.put(msg)
 
 #set up MQTT client
 client = mqtt.Client()
@@ -236,3 +261,6 @@ threading.Thread(target=publish).start()
 
 #start loop but non-blocking
 client.loop_start()
+
+
+#TODO: remove threading and use asyncio instead
