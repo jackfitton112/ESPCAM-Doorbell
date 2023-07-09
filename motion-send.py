@@ -18,10 +18,12 @@ except:
     print("Error getting environment variables")
     exit(1)
 
-
+# TODO: add optional auth for mqtt
 MQTT_KEEPALIVE = 60
 MQTT_TOPIC = "home/doorbell/motion"
 MQTT_SUB_TOPIC = "home/doorbell/live"
+#MQTT_USERNAME = "mqtt"
+#MQTT_PASSWORD = "mqtt"
 
     # Create the MQTT client
 client = mqtt.Client()
@@ -29,34 +31,38 @@ client = mqtt.Client()
     # Connect to the MQTT broker
 client.connect(MQTT_BROKER, MQTT_PORT, MQTT_KEEPALIVE)
 
+
+# This function gets called when the MQTT client is connected to the broker
 def on_connect(client, userdata, flags, rc):
-    #if successful, rc = 0
+    #if connection successful rc = 0
     if rc == 0:
+        #subscribes to the "home/doorbell/live" topic
         client.subscribe(MQTT_SUB_TOPIC)
     else:
         print("Connection failed")
 
-
+# This function gets called every time a message is received from the MQTT broker on the subscribed topic
 def on_message(client, userdata, msg):
+
     
-    # Get the message
+    
+    # Get the message from the MQTT broker
     message = msg.payload.decode("utf-8")
 
+    # If the message is "true" then get the images
     if message == "true":
-        # Get the images
-        #print("getting images")
+        # Get the images from the motion eye server
         get_images_http()
 
 
 
 
-# Setup the callbacks
-
+# Setup the callbacks for the MQTT client
 client.on_connect = on_connect
 client.on_message = on_message
      
 
-# Script settings
+# Script settings - TODO: move to env / ToF
 CAMERA_NAME = "front-door"
 IMAGE_DIR_PATH = ""
 
@@ -153,7 +159,7 @@ def get_images_http():
 
 
 
-
+#FIXME: all of this below needs fixing, should be async and not blocking
 client.loop_start()
 
 while True:
