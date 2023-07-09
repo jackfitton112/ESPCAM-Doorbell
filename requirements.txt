@@ -1,6 +1,0 @@
-paho-mqtt
-discord.py
-asyncio
-aihttp
-python-dotenv
-numpy
