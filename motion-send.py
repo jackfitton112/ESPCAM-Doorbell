@@ -29,7 +29,6 @@ def loadFromEnv():
 
     return True
 
-#load the variables from the .env file
 loadFromEnv()
 
 # Global variables, don't change these values
